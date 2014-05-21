@@ -1,0 +1,6 @@
+A heroku cli plguin for generating pgdiagnose reports from the cli
+
+I intend to merge this into the pg-extras project
+
+heroku plugins:install git://github.com/will/heroku-pg-diagnose.git
+
