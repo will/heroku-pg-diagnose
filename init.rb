@@ -1,3 +1,15 @@
+major, minor, _ = Heroku::VERSION.split(/\./).map(&:to_i)
+if major > 3
+  # ok
+elsif major == 3 && minor >= 4
+  # ok
+else
+    $stderr.puts(Heroku::Helpers.format_with_bang(<<-EOM))
+The heroku-pg-extras plugin was not loaded.
+It requires Heroku CLI version >= 3.4.0. You are using #{Heroku::VERSION}.
+EOM
+end
+
 class Heroku::Command::Pg < Heroku::Command::Base
   DIAGNOSE_URL = ENV.fetch('PGDIAGNOSE_URL', "https://pgdiagnose.herokuapp.com")
   # pg:diagnose [DATABASE|REPORT_ID]
@@ -38,7 +50,15 @@ class Heroku::Command::Pg < Heroku::Command::Base
       error("pg:diagnose is only available on Postgres version >= 9.2")
     end
 
-    params = {'url' => attachment.url}
+    logs_url = heroku.get("/apps/#{attachment.app}/logs?logplex=true&ps=heroku-postgres").to_s
+
+    params = {
+      'url'  => attachment.url,
+      'plan' => attachment.plan,
+      'logs' => logs_url,
+      'app'  => attachment.app,
+      'database' => attachment.config_var
+    }
 
     return Excon.post("#{DIAGNOSE_URL}/reports", :body => params.to_json)
   end
