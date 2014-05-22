@@ -22,7 +22,7 @@ class Heroku::Command::Pg < Heroku::Command::Base
     db_id = shift_argument
 
     if db_id =~ /\A[a-z0-9\-]{36}\z/
-      response = Excon.get("#{DIAGNOSE_URL}/reports/#{db_id}")
+      response = Excon.get("#{DIAGNOSE_URL}/reports/#{db_id}", :headers => {"Content-Type" => "application/json"})
       report = JSON.parse(response.body)
       puts "PG Diagnose report created #{report["created_at"]}"
     else
@@ -60,7 +60,7 @@ class Heroku::Command::Pg < Heroku::Command::Base
       'database' => attachment.config_var
     }
 
-    return Excon.post("#{DIAGNOSE_URL}/reports", :body => params.to_json)
+    return Excon.post("#{DIAGNOSE_URL}/reports", :body => params.to_json, :headers => {"Content-Type" => "application/json"})
   end
 
   def process_checks(status, checks)
