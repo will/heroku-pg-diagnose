@@ -31,7 +31,6 @@ class Heroku::Command::Pg < Heroku::Command::Base
       puts "PG Diagnose report available for 1 month at:"
     end
     puts "#{DIAGNOSE_URL}/reports/#{report["id"]}"
-    puts
 
     c = report['checks']
     process_checks 'red',     c.select{|f| f['status'] == 'red'}
@@ -64,20 +63,28 @@ class Heroku::Command::Pg < Heroku::Command::Base
   end
 
   def process_checks(status, checks)
-    return unless checks.size > 0
     color_code = { "red" => 31, "green" => 32, "yellow" => 33 }.fetch(status, 35)
+    return unless checks.size > 0
+
 
     checks.each do |check|
+      status = check['status']
       puts "\e[#{color_code}m#{status.upcase}: #{check['name']}\e[0m"
+      next if "green" == status
+
       results = check['results']
-      if results && results.size > 0
+      return unless results && results.size > 0
+
+      if results.first.kind_of? Array
+        puts "  " + results.first.map(&:capitalize).join(" ")
+      else
         display_table(
           results,
           results.first.keys,
           results.first.keys.map{ |field| field.split(/_/).map(&:capitalize).join(' ') }
         )
-        puts
       end
+      puts
     end
   end
 
