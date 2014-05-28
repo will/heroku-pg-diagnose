@@ -46,7 +46,7 @@ class Heroku::Command::Pg < Heroku::Command::Base
 
     @uri = URI.parse(attachment.url) # for nine_two?
     if !nine_two?
-      error("pg:diagnose is only available on Postgres version >= 9.2")
+      puts "WARNING: pg:diagnose is only suppoted on Postgres version >= 9.2. Some checks will not work"
     end
 
     logs_url = heroku.get("/apps/#{attachment.app}/logs?logplex=true&ps=heroku-postgres").to_s
