@@ -23,14 +23,14 @@ class Heroku::Command::Pg < Heroku::Command::Base
 
     if db_id =~ /\A[a-z0-9\-]{36}\z/
       response = Excon.get("#{DIAGNOSE_URL}/reports/#{db_id}", :headers => {"Content-Type" => "application/json"})
-      report = JSON.parse(response.body)
-      puts "PG Diagnose report created #{report["created_at"]}"
     else
       response = generate_report(db_id)
-      report = JSON.parse(response.body)
-      puts "PG Diagnose report available for 1 month at:"
     end
-    puts "#{DIAGNOSE_URL}/reports/#{report["id"]}"
+    report = JSON.parse(response.body)
+
+    puts "Report #{report["id"]} for #{report["app"]}::#{report["database"]}"
+    puts "available for one month after creation on #{report["created_at"]}"
+    puts
 
     c = report['checks']
     process_checks 'red',     c.select{|f| f['status'] == 'red'}
