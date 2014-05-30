@@ -27,12 +27,7 @@ class Heroku::Command::Pg < Heroku::Command::Base
   def diagnose
     db_id = shift_argument
 
-    if db_id =~ /\A[a-z0-9\-]{36}\z/
-      response = Excon.get("#{DIAGNOSE_URL}/reports/#{db_id}", :headers => {"Content-Type" => "application/json"})
-    else
-      response = generate_report(db_id)
-    end
-    report = JSON.parse(response.body)
+    report = find_or_generate_report(db_id)
 
     puts "Report #{report["id"]} for #{report["app"]}::#{report["database"]}"
     puts "available for one month after creation on #{report["created_at"]}"
@@ -46,6 +41,23 @@ class Heroku::Command::Pg < Heroku::Command::Base
   end
 
   private
+
+  def find_or_generate_report(db_id)
+    if db_id =~ /\A[a-z0-9\-]{36}\z/
+      response = get_report(db_id)
+    else
+      response = generate_report(db_id)
+    end
+
+    JSON.parse(response.body)
+  rescue Excon::Errors::Error
+    error("Unable to connect to PGDiagnose API, please try again later")
+  end
+
+  def get_report(report_id)
+    Excon.get("#{DIAGNOSE_URL}/reports/#{report_id}", :headers => {"Content-Type" => "application/json"})
+  end
+
   def generate_report(db_id)
     attachment = generate_resolver.resolve(db_id, "DATABASE_URL")
     validate_arguments!
@@ -53,7 +65,7 @@ class Heroku::Command::Pg < Heroku::Command::Base
 
     @uri = URI.parse(attachment.url) # for nine_two?
     if !nine_two?
-      puts "WARNING: pg:diagnose is only suppoted on Postgres version >= 9.2. Some checks will not work"
+      warn "WARNING: pg:diagnose is only fully suppoted on Postgres version >= 9.2. Some checks will be skipped.\n\n"
     end
 
     if attachment.starter_plan?
@@ -73,14 +85,21 @@ class Heroku::Command::Pg < Heroku::Command::Base
     return Excon.post("#{DIAGNOSE_URL}/reports", :body => params.to_json, :headers => {"Content-Type" => "application/json"})
   end
 
-  def process_checks(status, checks)
-    color_code = { "red" => 31, "green" => 32, "yellow" => 33 }.fetch(status, 35)
-    return unless checks.size > 0
+  def color(message, status)
+    if $stdout.tty?
+      color_code = { "red" => 31, "green" => 32, "yellow" => 33 }.fetch(status, 35)
+      return "\e[#{color_code}m#{message}\e[0m"
+    else
+      return message
+    end
+  end
 
+  def process_checks(status, checks)
+    return unless checks.size > 0
 
     checks.each do |check|
       status = check['status']
-      puts "\e[#{color_code}m#{status.upcase}: #{check['name']}\e[0m"
+      puts color("#{status.upcase}: #{check['name']}", status)
       next if "green" == status
 
       results = check['results']
