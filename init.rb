@@ -10,6 +10,12 @@ It requires Heroku CLI version >= 3.4.0. You are using #{Heroku::VERSION}.
 EOM
 end
 
+class Heroku::Client::HerokuPostgresql
+  def metrics
+    http_get "#{resource_name}/metrics"
+  end
+end
+
 class Heroku::Command::Pg < Heroku::Command::Base
   DIAGNOSE_URL = ENV.fetch('PGDIAGNOSE_URL', "https://pgdiagnose.herokuapp.com")
   # pg:diagnose [DATABASE|REPORT_ID]
@@ -44,17 +50,22 @@ class Heroku::Command::Pg < Heroku::Command::Base
     attachment = generate_resolver.resolve(db_id, "DATABASE_URL")
     validate_arguments!
 
+
     @uri = URI.parse(attachment.url) # for nine_two?
     if !nine_two?
       puts "WARNING: pg:diagnose is only suppoted on Postgres version >= 9.2. Some checks will not work"
     end
 
-    logs_url = heroku.get("/apps/#{attachment.app}/logs?logplex=true&ps=heroku-postgres").to_s
+    if attachment.starter_plan?
+      metrics = nil
+    else
+      metrics = hpg_client(attachment).metrics
+    end
 
     params = {
       'url'  => attachment.url,
       'plan' => attachment.plan,
-      'logs' => logs_url,
+      'metrics' => metrics,
       'app'  => attachment.app,
       'database' => attachment.config_var
     }
